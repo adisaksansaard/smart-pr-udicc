@@ -39,7 +39,7 @@ export default function Home() {
             </h2>
 
             <p className="text-5xl font-bold">
-              138
+              139
             </p>
           </div>
 
