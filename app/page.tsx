@@ -8,6 +8,8 @@ import {
   getDocs,
   deleteDoc,
   doc,
+  query,
+  orderBy,
 } from "firebase/firestore";
 
 import { db } from "../lib/firebase";
@@ -16,11 +18,25 @@ export default function Home() {
 
   const [title, setTitle] = useState("");
   const [detail, setDetail] = useState("");
+
   const [newsList, setNewsList] = useState<any[]>([]);
 
+  const [loading, setLoading] = useState(false);
+
+  // =========================
   // เพิ่มข่าว
+  // =========================
+
   const handleSubmit = async () => {
+
+    if (!title || !detail) {
+      alert("กรุณากรอกข้อมูล");
+      return;
+    }
+
     try {
+
+      setLoading(true);
 
       await addDoc(collection(db, "news"), {
         title,
@@ -28,106 +44,183 @@ export default function Home() {
         createdAt: new Date(),
       });
 
-      fetchNews();
-
       setTitle("");
       setDetail("");
 
-      alert("บันทึกสำเร็จ");
+      fetchNews();
+
+      alert("บันทึกข่าวสำเร็จ");
 
     } catch (error) {
 
       console.error(error);
       alert("เกิดข้อผิดพลาด");
 
+    } finally {
+
+      setLoading(false);
+
     }
   };
 
+  // =========================
   // ดึงข่าว
+  // =========================
+
   const fetchNews = async () => {
 
-    const querySnapshot = await getDocs(
-      collection(db, "news")
-    );
+    try {
 
-    const data = querySnapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    }));
+      const q = query(
+        collection(db, "news"),
+        orderBy("createdAt", "desc")
+      );
 
-    setNewsList(data);
+      const querySnapshot = await getDocs(q);
+
+      const data = querySnapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+
+      setNewsList(data);
+
+    } catch (error) {
+
+      console.error(error);
+
+    }
   };
 
+  // =========================
   // ลบข่าว
+  // =========================
+
   const deleteNews = async (id: string) => {
 
-    await deleteDoc(doc(db, "news", id));
+    const confirmDelete = confirm("ต้องการลบข่าวนี้ใช่ไหม");
 
-    fetchNews();
+    if (!confirmDelete) return;
+
+    try {
+
+      await deleteDoc(doc(db, "news", id));
+
+      fetchNews();
+
+    } catch (error) {
+
+      console.error(error);
+
+    }
   };
+
+  // =========================
+  // โหลดข่าวครั้งแรก
+  // =========================
 
   useEffect(() => {
     fetchNews();
   }, []);
 
   return (
-    <main className="min-h-screen bg-black text-white p-10">
 
-      <section className="max-w-3xl mx-auto space-y-4">
+    <main className="min-h-screen bg-black text-white p-6">
 
-        <h1 className="text-4xl font-bold">
-          Smart PR UDICC
-        </h1>
+      <section className="max-w-4xl mx-auto">
 
-        <input
-          type="text"
-          placeholder="หัวข้อข่าว"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          className="w-full border p-4 rounded-xl text-black bg-white"
-        />
+        {/* HEADER */}
 
-        <textarea
-          placeholder="รายละเอียดข่าว"
-          value={detail}
-          onChange={(e) => setDetail(e.target.value)}
-          className="w-full border p-4 rounded-xl h-40 text-black bg-white"
-        />
+        <div className="mb-10">
 
-        <button
-          onClick={handleSubmit}
-          className="bg-blue-600 px-6 py-4 rounded-xl font-bold"
-        >
-          Generate ข่าวอัตโนมัติ
-        </button>
+          <h1 className="text-5xl font-black">
+            Smart PR UDICC
+          </h1>
 
-        <div className="mt-10 grid gap-4">
+          <p className="text-gray-400 mt-2">
+            ระบบจัดการข่าวประชาสัมพันธ์
+          </p>
 
-          {newsList.map((item) => (
+        </div>
 
-            <div
-              key={item.id}
-              className="bg-white text-black p-6 rounded-2xl"
-            >
+        {/* FORM */}
 
-              <h2 className="text-2xl font-bold">
-                {item.title}
-              </h2>
+        <div className="bg-zinc-900 p-6 rounded-3xl space-y-4 border border-zinc-800">
 
-              <p className="mt-2">
-                {item.detail}
-              </p>
+          <input
+            type="text"
+            placeholder="หัวข้อข่าว"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            className="w-full p-4 rounded-2xl bg-white text-black outline-none"
+          />
 
-              <button
-                onClick={() => deleteNews(item.id)}
-                className="mt-4 bg-red-600 text-white px-4 py-2 rounded-lg"
+          <textarea
+            placeholder="รายละเอียดข่าว"
+            value={detail}
+            onChange={(e) => setDetail(e.target.value)}
+            className="w-full h-40 p-4 rounded-2xl bg-white text-black outline-none"
+          />
+
+          <button
+            onClick={handleSubmit}
+            disabled={loading}
+            className="bg-blue-600 hover:bg-blue-700 transition px-8 py-4 rounded-2xl font-bold text-lg"
+          >
+            {loading ? "กำลังบันทึก..." : "Generate ข่าวอัตโนมัติ"}
+          </button>
+
+        </div>
+
+        {/* NEWS */}
+
+        <div className="mt-10">
+
+          <h2 className="text-3xl font-bold mb-6">
+            ข่าวทั้งหมด
+          </h2>
+
+          <div className="grid gap-6">
+
+            {newsList.length === 0 && (
+
+              <div className="bg-zinc-900 p-10 rounded-3xl text-center text-gray-400">
+                ยังไม่มีข่าว
+              </div>
+
+            )}
+
+            {newsList.map((item) => (
+
+              <div
+                key={item.id}
+                className="bg-white text-black p-6 rounded-3xl shadow-lg"
               >
-                ลบข่าว
-              </button>
 
-            </div>
+                <h2 className="text-2xl font-black">
+                  {item.title}
+                </h2>
 
-          ))}
+                <p className="mt-3 text-lg whitespace-pre-wrap">
+                  {item.detail}
+                </p>
+
+                <div className="mt-6 flex gap-3">
+
+                  <button
+                    onClick={() => deleteNews(item.id)}
+                    className="bg-red-600 hover:bg-red-700 text-white px-5 py-3 rounded-xl font-bold transition"
+                  >
+                    ลบข่าว
+                  </button>
+
+                </div>
+
+              </div>
+
+            ))}
+
+          </div>
 
         </div>
 
