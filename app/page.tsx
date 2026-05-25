@@ -16,27 +16,23 @@ import {
   ref,
   uploadBytes,
   getDownloadURL,
-  deleteObject,
 } from "firebase/storage";
 
-import { db, storage } from "../lib/firebase";
+import { db, storage } from "./lib/firebase";
 
 export default function Home() {
 
   const [title, setTitle] = useState("");
-
   const [detail, setDetail] = useState("");
 
-  const [image, setImage] = useState<File | null>(null);
-
-  const [preview, setPreview] = useState("");
+  const [imageFile, setImageFile] = useState<File | null>(null);
 
   const [newsList, setNewsList] = useState<any[]>([]);
 
   const [loading, setLoading] = useState(false);
 
   // =========================
-  // Upload News
+  // เพิ่มข่าว
   // =========================
 
   const handleSubmit = async () => {
@@ -52,41 +48,36 @@ export default function Home() {
 
       let imageUrl = "";
 
+      // =========================
       // Upload Image
+      // =========================
 
-      if (image) {
+      if (imageFile) {
 
         const imageRef = ref(
           storage,
-          `news/${Date.now()}-${image.name}`
+          `news/${Date.now()}-${imageFile.name}`
         );
 
-        await uploadBytes(imageRef, image);
+        await uploadBytes(imageRef, imageFile);
 
         imageUrl = await getDownloadURL(imageRef);
       }
 
+      // =========================
       // Save Firestore
+      // =========================
 
       await addDoc(collection(db, "news"), {
-
         title,
-
         detail,
-
         imageUrl,
-
         createdAt: new Date(),
-
       });
 
       setTitle("");
-
       setDetail("");
-
-      setImage(null);
-
-      setPreview("");
+      setImageFile(null);
 
       fetchNews();
 
@@ -95,7 +86,6 @@ export default function Home() {
     } catch (error) {
 
       console.error(error);
-
       alert("เกิดข้อผิดพลาด");
 
     } finally {
@@ -106,51 +96,47 @@ export default function Home() {
   };
 
   // =========================
-  // Fetch News
+  // ดึงข่าว
   // =========================
 
   const fetchNews = async () => {
 
-    const q = query(
-      collection(db, "news"),
-      orderBy("createdAt", "desc")
-    );
+    try {
 
-    const querySnapshot = await getDocs(q);
+      const q = query(
+        collection(db, "news"),
+        orderBy("createdAt", "desc")
+      );
 
-    const data = querySnapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    }));
+      const querySnapshot = await getDocs(q);
 
-    setNewsList(data);
+      const data = querySnapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+
+      setNewsList(data);
+
+    } catch (error) {
+
+      console.error(error);
+
+    }
   };
 
   // =========================
-  // Delete News
+  // ลบข่าว
   // =========================
 
-  const deleteNews = async (
-    id: string,
-    imageUrl?: string
-  ) => {
+  const deleteNews = async (id: string) => {
 
-    const confirmDelete = confirm("ลบข่าวนี้ใช่ไหม");
+    const confirmDelete = confirm("ต้องการลบข่าวนี้ใช่ไหม");
 
     if (!confirmDelete) return;
 
     try {
 
       await deleteDoc(doc(db, "news", id));
-
-      // Delete image
-
-      if (imageUrl) {
-
-        const imageRef = ref(storage, imageUrl);
-
-        await deleteObject(imageRef).catch(() => {});
-      }
 
       fetchNews();
 
@@ -160,6 +146,10 @@ export default function Home() {
 
     }
   };
+
+  // =========================
+  // โหลดข่าวครั้งแรก
+  // =========================
 
   useEffect(() => {
     fetchNews();
@@ -187,58 +177,42 @@ export default function Home() {
 
         {/* FORM */}
 
-        <div className="bg-zinc-900 p-6 rounded-3xl border border-zinc-800 space-y-4">
+        <div className="bg-zinc-900 p-6 rounded-3xl space-y-4 border border-zinc-800">
 
           <input
             type="text"
             placeholder="หัวข้อข่าว"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            className="w-full p-4 rounded-2xl text-black bg-white"
+            className="w-full p-4 rounded-2xl bg-white text-black outline-none"
           />
 
           <textarea
             placeholder="รายละเอียดข่าว"
             value={detail}
             onChange={(e) => setDetail(e.target.value)}
-            className="w-full h-40 p-4 rounded-2xl text-black bg-white"
+            className="w-full h-40 p-4 rounded-2xl bg-white text-black outline-none"
           />
 
-          {/* Upload */}
+          {/* Upload Image */}
 
           <input
             type="file"
             accept="image/*"
             onChange={(e) => {
 
-              const file = e.target.files?.[0];
-
-              if (file) {
-
-                setImage(file);
-
-                setPreview(URL.createObjectURL(file));
+              if (e.target.files?.[0]) {
+                setImageFile(e.target.files[0]);
               }
+
             }}
-            className="w-full"
+            className="w-full bg-white text-black p-4 rounded-2xl"
           />
-
-          {/* Preview */}
-
-          {preview && (
-
-            <img
-              src={preview}
-              alt="preview"
-              className="w-full h-72 object-cover rounded-2xl"
-            />
-
-          )}
 
           <button
             onClick={handleSubmit}
             disabled={loading}
-            className="bg-blue-600 hover:bg-blue-700 px-8 py-4 rounded-2xl font-bold text-lg transition"
+            className="bg-blue-600 hover:bg-blue-700 transition px-8 py-4 rounded-2xl font-bold text-lg"
           >
             {loading ? "กำลังบันทึก..." : "Generate ข่าวอัตโนมัติ"}
           </button>
@@ -253,13 +227,21 @@ export default function Home() {
             ข่าวทั้งหมด
           </h2>
 
-          <div className="grid gap-8">
+          <div className="grid gap-6">
+
+            {newsList.length === 0 && (
+
+              <div className="bg-zinc-900 p-10 rounded-3xl text-center text-gray-400">
+                ยังไม่มีข่าว
+              </div>
+
+            )}
 
             {newsList.map((item) => (
 
               <div
                 key={item.id}
-                className="bg-white text-black rounded-3xl overflow-hidden shadow-lg"
+                className="bg-white text-black p-6 rounded-3xl shadow-lg"
               >
 
                 {/* Image */}
@@ -268,27 +250,25 @@ export default function Home() {
 
                   <img
                     src={item.imageUrl}
-                    alt={item.title}
-                    className="w-full h-80 object-cover"
+                    alt="news"
+                    className="w-full h-72 object-cover rounded-2xl mb-5"
                   />
 
                 )}
 
-                <div className="p-6">
+                <h2 className="text-2xl font-black">
+                  {item.title}
+                </h2>
 
-                  <h2 className="text-3xl font-black">
-                    {item.title}
-                  </h2>
+                <p className="mt-3 text-lg whitespace-pre-wrap">
+                  {item.detail}
+                </p>
 
-                  <p className="mt-4 text-lg whitespace-pre-wrap">
-                    {item.detail}
-                  </p>
+                <div className="mt-6 flex gap-3">
 
                   <button
-                    onClick={() =>
-                      deleteNews(item.id, item.imageUrl)
-                    }
-                    className="mt-6 bg-red-600 hover:bg-red-700 text-white px-5 py-3 rounded-xl font-bold transition"
+                    onClick={() => deleteNews(item.id)}
+                    className="bg-red-600 hover:bg-red-700 text-white px-5 py-3 rounded-xl font-bold transition"
                   >
                     ลบข่าว
                   </button>
