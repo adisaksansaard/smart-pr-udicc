@@ -1,14 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState, useEffect } from "react";
 
 import {
   collection,
   addDoc,
   getDocs,
+  deleteDoc,
+  doc,
 } from "firebase/firestore";
 
-import { db } from "./lib/firebase";
+import { db } from "../lib/firebase";
 
 export default function Home() {
 
@@ -16,8 +18,10 @@ export default function Home() {
   const [detail, setDetail] = useState("");
   const [newsList, setNewsList] = useState<any[]>([]);
 
+  // เพิ่มข่าว
   const handleSubmit = async () => {
     try {
+
       await addDoc(collection(db, "news"), {
         title,
         detail,
@@ -26,15 +30,22 @@ export default function Home() {
 
       fetchNews();
 
+      setTitle("");
+      setDetail("");
+
       alert("บันทึกสำเร็จ");
 
     } catch (error) {
+
       console.error(error);
       alert("เกิดข้อผิดพลาด");
+
     }
   };
 
+  // ดึงข่าว
   const fetchNews = async () => {
+
     const querySnapshot = await getDocs(
       collection(db, "news")
     );
@@ -45,6 +56,14 @@ export default function Home() {
     }));
 
     setNewsList(data);
+  };
+
+  // ลบข่าว
+  const deleteNews = async (id: string) => {
+
+    await deleteDoc(doc(db, "news", id));
+
+    fetchNews();
   };
 
   useEffect(() => {
@@ -61,19 +80,19 @@ export default function Home() {
         </h1>
 
         <input
-  type="text"
-  placeholder="หัวข้อข่าว"
-  value={title}
-  onChange={(e) => setTitle(e.target.value)}
-  className="w-full border p-4 rounded-xl text-black bg-white"
-/>
+          type="text"
+          placeholder="หัวข้อข่าว"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          className="w-full border p-4 rounded-xl text-black bg-white"
+        />
 
         <textarea
-  placeholder="รายละเอียดข่าว"
-  value={detail}
-  onChange={(e) => setDetail(e.target.value)}
-  className="w-full border p-4 rounded-xl h-40 text-black bg-white"
-/>
+          placeholder="รายละเอียดข่าว"
+          value={detail}
+          onChange={(e) => setDetail(e.target.value)}
+          className="w-full border p-4 rounded-xl h-40 text-black bg-white"
+        />
 
         <button
           onClick={handleSubmit}
@@ -82,19 +101,29 @@ export default function Home() {
           Generate ข่าวอัตโนมัติ
         </button>
 
-        <div className="space-y-4 mt-10">
+        <div className="mt-10 grid gap-4">
 
           {newsList.map((item) => (
 
             <div
               key={item.id}
-              className="bg-white text-black p-4 rounded-xl"
+              className="bg-white text-black p-6 rounded-2xl"
             >
+
               <h2 className="text-2xl font-bold">
                 {item.title}
               </h2>
 
-              <p>{item.detail}</p>
+              <p className="mt-2">
+                {item.detail}
+              </p>
+
+              <button
+                onClick={() => deleteNews(item.id)}
+                className="mt-4 bg-red-600 text-white px-4 py-2 rounded-lg"
+              >
+                ลบข่าว
+              </button>
 
             </div>
 
